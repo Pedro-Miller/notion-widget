@@ -28,54 +28,58 @@
 
     <script>
     const pinterestBoard = "https://br.pinterest.com/pedromiller0573/notion/";
-    const rssUrl = pinterestBoard.replace(/\/$/, "") + ".rss/";
-
+    
     async function loadAsset() {
+        const imgElement = document.getElementById("asset");
+        
         try {
-            // Cache buster dinâmico para forçar o sorteio no servidor
-            const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&t=${Date.now()}`;
+            // 1. Geramos um RSS URL único para enganar a cache do Pinterest
+            const rssUrl = pinterestBoard.replace(/\/$/, "") + ".rss/?nocache=" + Date.now();
             
-            const res = await fetch(apiUrl);
+            // 2. Geramos um Proxy URL único para enganar a cache do AllOrigins
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}&_=${Date.now()}`;
+            
+            const res = await fetch(proxyUrl);
             const data = await res.json();
             
-            if (data.status === 'ok' && data.items.length > 0) {
-                const randomItem = data.items[Math.floor(Math.random() * data.items.length)];
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(data.contents, "text/xml");
+            const items = xmlDoc.getElementsByTagName("item");
+
+            // LOG DE DEBUG: Abre a consola (F12) no browser para ver isto
+            console.log("Pins encontrados no feed:", items.length);
+
+            if (items.length > 0) {
+                // Sorteio puramente aleatório no cliente
+                const randomIndex = Math.floor(Math.random() * items.length);
+                const randomItem = items[randomIndex];
+                const description = randomItem.getElementsByTagName("description")[0].textContent;
+                
                 const imgRegex = /src="([^"]+)"/;
-                const match = randomItem.description.match(imgRegex);
+                const match = description.match(imgRegex);
                 
                 if (match && match[1]) {
-                    // Força alta resolução (Originals)
                     const highRes = match[1].replace(/\/\d+x\//, "/originals/");
-                    const img = document.getElementById("asset");
-
-                    // Efeito de transição
-                    img.style.opacity = "0";
-
+                    
+                    imgElement.style.opacity = "0";
                     setTimeout(() => {
-                        img.src = highRes;
-                    }, 500); 
+                        imgElement.src = highRes;
+                    }, 500);
 
-                    img.onload = () => {
-                        img.style.opacity = "1";
-                    };
+                    imgElement.onload = () => imgElement.style.opacity = "1";
+                    return;
                 }
             }
         } catch (err) { 
-            console.error("Erro ao carregar feed."); 
+            console.error("Erro na carga:", err);
         }
     }
 
-    // --- Lógica de Inicialização (Anti-Sincronização) ---
+    // Delay inicial aleatório para desincronizar widgets
+    setTimeout(loadAsset, Math.floor(Math.random() * 3000));
 
-    // 1. Delay inicial aleatório (0 a 5 segundos)
-    // Garante que cada widget comece em um momento diferente
-    const stagger = Math.floor(Math.random() * 5000); 
-    setTimeout(loadAsset, stagger);
-
-    // 2. Loop de 5 minutos + "Ruído" aleatório (0 a 30 segundos)
-    // Impede que os widgets troquem a imagem todos ao mesmo tempo depois do load
-    const noise = Math.floor(Math.random() * 30000); 
-    setInterval(loadAsset, 300000 + noise);
+    // Loop de 5 minutos
+    setInterval(loadAsset, 300000);
 </script>
 </body>
 </html>

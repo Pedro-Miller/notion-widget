@@ -27,33 +27,55 @@
     </div>
 
     <script>
-        // Substitua pelo link da sua pasta PÚBLICA
-        const pinterestBoard = "https://br.pinterest.com/pedromiller0573/notion/";
-        
-        const rssUrl = pinterestBoard.replace(/\/$/, "") + ".rss/";
-        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&t=${Date.now()}`;
+    const pinterestBoard = "https://br.pinterest.com/pedromiller0573/notion/";
+    const rssUrl = pinterestBoard.replace(/\/$/, "") + ".rss/";
 
-        async function loadAsset() {
-            try {
-                const res = await fetch(apiUrl);
-                const data = await res.json();
+    async function loadAsset() {
+        try {
+            // Cache buster dinâmico para forçar o sorteio no servidor
+            const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&t=${Date.now()}`;
+            
+            const res = await fetch(apiUrl);
+            const data = await res.json();
+            
+            if (data.status === 'ok' && data.items.length > 0) {
+                const randomItem = data.items[Math.floor(Math.random() * data.items.length)];
+                const imgRegex = /src="([^"]+)"/;
+                const match = randomItem.description.match(imgRegex);
                 
-                if (data.status === 'ok' && data.items.length > 0) {
-                    const randomItem = data.items[Math.floor(Math.random() * data.items.length)];
-                    const imgRegex = /src="([^"]+)"/;
-                    const match = randomItem.description.match(imgRegex);
-                    
-                    if (match && match[1]) {
-                        // REGENERAÇÃO DE QUALIDADE: Troca miniaturas (236x, 564x, etc) pela original
-                        const highRes = match[1].replace(/\/\d+x\//, "/originals/");
-                        const img = document.getElementById("asset");
+                if (match && match[1]) {
+                    // Força alta resolução (Originals)
+                    const highRes = match[1].replace(/\/\d+x\//, "/originals/");
+                    const img = document.getElementById("asset");
+
+                    // Efeito de transição
+                    img.style.opacity = "0";
+
+                    setTimeout(() => {
                         img.src = highRes;
-                        img.onload = () => img.style.opacity = "1";
-                    }
+                    }, 500); 
+
+                    img.onload = () => {
+                        img.style.opacity = "1";
+                    };
                 }
-            } catch (err) { console.error("Erro ao carregar feed."); }
+            }
+        } catch (err) { 
+            console.error("Erro ao carregar feed."); 
         }
-        loadAsset();
-    </script>
+    }
+
+    // --- Lógica de Inicialização (Anti-Sincronização) ---
+
+    // 1. Delay inicial aleatório (0 a 5 segundos)
+    // Garante que cada widget comece em um momento diferente
+    const stagger = Math.floor(Math.random() * 5000); 
+    setTimeout(loadAsset, stagger);
+
+    // 2. Loop de 5 minutos + "Ruído" aleatório (0 a 30 segundos)
+    // Impede que os widgets troquem a imagem todos ao mesmo tempo depois do load
+    const noise = Math.floor(Math.random() * 30000); 
+    setInterval(loadAsset, 300000 + noise);
+</script>
 </body>
 </html>
